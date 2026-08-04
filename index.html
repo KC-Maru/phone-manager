@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>휴대폰 회선 관리자 (구글 동기화 & 모바일 지원)</title>
-    
+
     <!-- SheetJS CDN (엑셀 처리) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -207,7 +207,9 @@
         .SKT { background-color: #ea580c; }
         .KT { background-color: #0284c7; }
         .LGU { background-color: #db2777; }
-        .알뜰폰 { background-color: #16a34a; }
+        .MVNO-SKT { background-color: #16a34a; }
+        .MVNO-KT { background-color: #0d9488; }
+        .MVNO-LGU { background-color: #9333ea; }
 
         .phone-num {
             font-weight: 700;
@@ -294,7 +296,9 @@
                         <option value="SKT">SKT</option>
                         <option value="KT">KT</option>
                         <option value="LGU">LGU+</option>
-                        <option value="알뜰폰">알뜰폰</option>
+                        <option value="MVNO-SKT">알뜰폰 (SKT망)</option>
+                        <option value="MVNO-KT">알뜰폰 (KT망)</option>
+                        <option value="MVNO-LGU">알뜰폰 (LGU+망)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -306,8 +310,12 @@
                     <input type="date" id="openDate" required>
                 </div>
                 <div class="form-group">
+                    <label for="neutralDays">중립 가능 기간 (일)</label>
+                    <input type="number" id="neutralDays" value="93">
+                </div>
+                <div class="form-group">
                     <label for="minCallDays">의무 통화 유지기간 (일)</label>
-                    <input type="number" id="minCallDays" value="93">
+                    <input type="number" id="minCallDays" value="183">
                 </div>
                 <div class="form-group">
                     <label for="mandatoryMonths">의무 유지기간 (M+개월)</label>
@@ -456,10 +464,22 @@
             const target = new Date(targetDateStr);
             target.setHours(0,0,0,0);
             const diffDays = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
-            
+
             if (diffDays > 0) return `D-${diffDays}`;
             if (diffDays === 0) return `D-Day`;
             return `해제완료 (+${Math.abs(diffDays)}일)`;
+        }
+
+        function getTelecomLabel(val) {
+            const map = {
+                'SKT': 'SKT',
+                'KT': 'KT',
+                'LGU': 'LGU+',
+                'MVNO-SKT': '알뜰폰 (SKT)',
+                'MVNO-KT': '알뜰폰 (KT)',
+                'MVNO-LGU': '알뜰폰 (LGU+)'
+            };
+            return map[val] || val;
         }
 
         document.getElementById('lineForm').addEventListener('submit', function(e) {
@@ -469,6 +489,7 @@
                 telecom: document.getElementById('telecom').value,
                 phoneNumber: document.getElementById('phoneNumber').value,
                 openDate: document.getElementById('openDate').value,
+                neutralDays: document.getElementById('neutralDays').value,
                 minCallDays: document.getElementById('minCallDays').value,
                 mandatoryMonths: document.getElementById('mandatoryMonths').value,
                 memo: document.getElementById('memo').value
@@ -488,9 +509,12 @@
             }
 
             lineList.innerHTML = lines.map(line => {
+                const neutralDays = line.neutralDays || 93;
+                const neutralUnlockDate = formatDate(addDays(line.openDate, neutralDays));
                 const callUnlockDate = formatDate(addDays(line.openDate, line.minCallDays));
                 const mPlusUnlockDate = formatDate(getMPlusDate(line.openDate, line.mandatoryMonths));
 
+                const neutralDDay = getDDay(neutralUnlockDate);
                 const callDDay = getDDay(callUnlockDate);
                 const mPlusDDay = getDDay(mPlusUnlockDate);
 
@@ -499,23 +523,30 @@
                         <button class="btn-delete" onclick="deleteLine(${line.id})">&times;</button>
                         <div class="line-header">
                             <span class="phone-num">${line.phoneNumber}</span>
-                            <span class="telecom-badge ${line.telecom}">${line.telecom}</span>
+                            <span class="telecom-badge ${line.telecom}">${getTelecomLabel(line.telecom)}</span>
                         </div>
                         <div class="info-row">
                             <span class="info-label">개통일:</span>
                             <span class="info-value">${line.openDate}</span>
                         </div>
                         <div class="info-row">
+                            <span class="info-label">중립 가능 (+${neutralDays}일):</span>
+                            <span class="info-value">
+                                ${neutralUnlockDate}
+                                <span class="status-tag ${neutralDDay.includes('완료') ? 'status-ok' : 'status-wait'}">${neutralDDay}</span>
+                            </span>
+                        </div>
+                        <div class="info-row">
                             <span class="info-label">의무통화 (+${line.minCallDays}일):</span>
                             <span class="info-value">
-                                ${callUnlockDate} 
+                                ${callUnlockDate}
                                 <span class="status-tag ${callDDay.includes('완료') ? 'status-ok' : 'status-wait'}">${callDDay}</span>
                             </span>
                         </div>
                         <div class="info-row">
                             <span class="info-label">유지기간 (M+${line.mandatoryMonths}):</span>
                             <span class="info-value">
-                                ${mPlusUnlockDate} 
+                                ${mPlusUnlockDate}
                                 <span class="status-tag ${mPlusDDay.includes('완료') ? 'status-ok' : 'status-wait'}">${mPlusDDay}</span>
                             </span>
                         </div>
@@ -532,9 +563,10 @@
             if (lines.length === 0) return alert('내보낼 데이터가 없습니다.');
 
             const exportData = lines.map(line => ({
-                '통신사': line.telecom,
+                '통신사': getTelecomLabel(line.telecom),
                 '회선명/번호': line.phoneNumber,
                 '개통일': line.openDate,
+                '중립가능일수': line.neutralDays || 93,
                 '의무통화일수': line.minCallDays,
                 '의무유지개월(M+)': line.mandatoryMonths,
                 '메모': line.memo || ''
@@ -557,12 +589,18 @@
                 const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
                 json.forEach((row, index) => {
+                    let telecomVal = row['통신사'] || 'SKT';
+                    if (telecomVal.includes('SKT') && telecomVal.includes('알뜰')) telecomVal = 'MVNO-SKT';
+                    else if (telecomVal.includes('KT') && telecomVal.includes('알뜰')) telecomVal = 'MVNO-KT';
+                    else if (telecomVal.includes('LGU') && telecomVal.includes('알뜰')) telecomVal = 'MVNO-LGU';
+
                     saveLineData({
                         id: Date.now() + index,
-                        telecom: row['통신사'] || 'SKT',
+                        telecom: telecomVal,
                         phoneNumber: row['회선명/번호'] || '회선' + (index + 1),
                         openDate: row['개통일'] ? formatDate(new Date(row['개통일'])) : formatDate(new Date()),
-                        minCallDays: row['의무통화일수'] || 93,
+                        neutralDays: row['중립가능일수'] || 93,
+                        minCallDays: row['의무통화일수'] || 183,
                         mandatoryMonths: row['의무유지개월(M+)'] || 6,
                         memo: row['메모'] || ''
                     });
