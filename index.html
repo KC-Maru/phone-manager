@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>휴대폰 회선 관리</title>
+
+    <!-- SheetJS CDN (엑셀 처리) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- Firebase SDK (v9+ Compatibility Module) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #e2e8f0;
+            --danger-color: #ef4444;
+            --success-color: #16a34a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 16px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            background: white;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+        }
+
+        .btn-auth {
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+
+        .btn-google {
+            background-color: #4285f4;
+            color: white;
+        }
+
+        .btn-logout {
+            background-color: #64748b;
+            color: white;
+        }
+
+        .action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .view-tab-group {
+            display: flex;
+            gap: 4px;
+            background: #e2e8f0;
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .btn-tab {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+        }
+
+        .btn-tab.active {
+            background: white;
+            color: var(--primary-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .btn-excel {
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: #16a34a;
+            color: white;
+            cursor: pointer;
+        }
+
+        .btn-outline {
+            background-color: white;
+            color: var(--text-color);
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 850px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .custom-field-group {
+            background: #f1f5f9;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .input-dual {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .input-dual input[type="text"] {
+            flex: 1.3;
+        }
+
+        .input-dual input[type="number"] {
+            flex: 1;
+        }
+
+        .input-dual select {
+            flex: 0.9;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-cancel {
+            width: 100%;
+            padding: 8px;
+            background-color: #64748b;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 6px;
+            display: none;
+        }
+
+        .line-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .line-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            position: relative;
+            transition: border-color 0.2s;
+        }
+
+        .line-card.editing {
+            border: 2px solid var(--primary-color);
+            background-color: #eff6ff;
+        }
+
+        .line-header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            padding-right: 50px;
+        }
+
+        .card-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .nickname-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+
+        .phone-sub-title {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-top: 2px;
+            font-weight: 500;
+        }
+
+        .telecom-badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: white;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        .SKT { background-color: #ea580c; }
+        .KT { background-color: #0284c7; }
+        .LGU { background-color: #db2777; }
+        .MVNO-SKT { background-color: #16a34a; }
+        .MVNO-KT { background-color: #0d9488; }
+        .MVNO-LGU { background-color: #9333ea; }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+        }
+
+        .info-label { color: #64748b; }
+        .info-value { font-weight: 600; }
+
+        .status-tag {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .status-ok { background: #dcfce7; color: #15803d; }
+        .status-wait { background: #fef3c7; color: #b45309; }
+
+        .card-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 4px;
+        }
+
+        .btn-card-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+
+        .btn-card-icon:hover {
+            background-color: #e2e8f0;
+        }
+
+        .memo-box {
+            background-color: #f1f5f9;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: #475569;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+
+        .table-wrapper {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+
+        .terms-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        .terms-table th, .terms-table td {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        .terms-table th {
+            background: #f8fafc;
+            font-weight: 700;
+            color: #334155;
+            white-space: nowrap;
+            font-size: 0.88rem;
+        }
+
+        .terms-table th:nth-child(1), .terms-table td:nth-child(1) { min-width: 180px; }
+        .terms-table th:nth-child(2), .terms-table td:nth-child(2) { min-width: 120px; }
+        .terms-table th:nth-child(3), .terms-table td:nth-child(3) { min-width: 110px; }
+        .terms-table th:nth-child(4), .terms-table td:nth-child(4) { min-width: 160px; }
+        .terms-table th:nth-child(5), .terms-table td:nth-child(5) { min-width: 110px; }
+        .terms-table th:nth-child(6), .terms-table td:nth-child(6) { min-width: 120px; }
+        .terms-table th:nth-child(7), .terms-table td:nth-child(7) { min-width: 140px; }
+        .terms-table th:nth-child(8), .terms-table td:nth-child(8) { width: 70px; text-align: center; }
+
+        .terms-table tr:hover {
+            background-color: #f1f5f9;
+        }
+
+        .search-box {
+            margin-bottom: 12px;
+            max-width: 320px;
+            padding: 9px 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>📱 회선 관리 매니저</h1>
+            <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
+                총 회선: <span id="total-count" style="font-weight:bold; color:var(--primary-color);">0</span>개
+            </div>
+        </div>
+        <div class="user-section">
+            <div id="userInfo" class="user-info" style="display: none;">
+                <img id="userAvatar" class="user-avatar" src="" alt="user">
+                <span id="userName"></span>
+                <button class="btn-auth btn-logout" onclick="googleLogout()">로그아웃</button>
+            </div>
+            <button id="btnLogin" class="btn-auth btn-google" onclick="googleLogin()">
+                🔍 구글 계정으로 로그인
+            </button>
+        </div>
+    </header>
+
+    <div class="action-bar">
+        <div class="view-tab-group">
+            <button id="tabCardView" class="btn-tab active" onclick="switchView('card')">📱 카드 보기</button>
+            <button id="tabTableView" class="btn-tab" onclick="switchView('table')">📅 설정 기간 모아보기</button>
+        </div>
+        <div>
+            <button class="btn-excel" onclick="exportToExcel()">📊 엑셀 저장 (.xlsx)</button>
+            <button class="btn-excel btn-outline" onclick="document.getElementById('excelFileInput').click()">📂 엑셀 불러오기</button>
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display: none;" onchange="importFromExcel(event)">
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 회선 입력 / 수정 폼 -->
+        <div class="card">
+            <h2 id="formTitle" style="font-size: 1rem; margin-bottom: 12px;">신규 회선 추가</h2>
+            <form id="lineForm">
+                <input type="hidden" id="editLineId" value="">
+                <div class="form-group">
+                    <label for="telecom">통신사</label>
+                    <select id="telecom" required>
+                        <option value="SKT">SKT</option>
+                        <option value="KT">KT</option>
+                        <option value="LGU">LGU+</option>
+                        <option value="MVNO-SKT">알뜰폰 (SKT망)</option>
+                        <option value="MVNO-KT">알뜰폰 (KT망)</option>
+                        <option value="MVNO-LGU">알뜰폰 (LGU+망)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="nickname">애칭 (이름)</label>
+                    <input type="text" id="nickname" placeholder="예: 메인폰, 세컨드" required>
+                </div>
+                <div class="form-group">
+                    <label for="phoneNumber">전화번호</label>
+                    <input type="text" id="phoneNumber" placeholder="예: 010-1234-5678" required>
+                </div>
+                <div class="form-group">
+                    <label for="openDate">개통일</label>
+                    <input type="date" id="openDate" required>
+                </div>
+
+                <!-- 사용자 정의 기간 설정 1 -->
+                <div class="custom-field-group">
+                    <label>기간 설정 1 (항목명 / 값)</label>
+                    <div class="input-dual">
+                        <input type="text" id="term1Label" value="" placeholder="항목명 (예: 중립가능)">
+                        <input type="number" id="term1Value" value="" placeholder="숫자">
+                        <select id="term1Unit">
+                            <option value="days">일</option>
+                            <option value="mplus">M+개월</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 사용자 정의 기간 설정 2 -->
+                <div class="custom-field-group">
+                    <label>기간 설정 2 (항목명 / 값)</label>
+                    <div class="input-dual">
+                        <input type="text" id="term2Label" value="" placeholder="항목명 (예: 의무통화)">
+                        <input type="number" id="term2Value" value="" placeholder="숫자">
+                        <select id="term2Unit">
+                            <option value="days">일</option>
+                            <option value="mplus">M+개월</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 사용자 정의 기간 설정 3 -->
+                <div class="custom-field-group">
+                    <label>기간 설정 3 (항목명 / 값)</label>
+                    <div class="input-dual">
+                        <input type="text" id="term3Label" value="" placeholder="항목명 (예: 의무유지)">
+                        <input type="number" id="term3Value" value="" placeholder="숫자">
+                        <select id="term3Unit">
+                            <option value="mplus">M+개월</option>
+                            <option value="days">일</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="memo">메모</label>
+                    <textarea id="memo" rows="3" placeholder="요금제 조건, 부가서비스 해지일 등"></textarea>
+                </div>
+                <button type="submit" id="btnSubmit" class="btn-submit">회선 저장하기</button>
+                <button type="button" id="btnCancel" class="btn-cancel" onclick="resetForm()">수정 취소</button>
+            </form>
+        </div>
+
+        <!-- 카드 / 리스트 영역 -->
+        <div>
+            <!-- 1. 회선 카드 목록 뷰 -->
+            <div id="cardViewArea">
+                <div id="lineList" class="line-grid"></div>
+            </div>
+
+            <!-- 2. 전체 기간 설정 리스트 뷰 -->
+            <div id="tableViewArea" style="display: none;">
+                <input type="text" id="tableFilterInput" class="search-box" placeholder="🔍 애칭, 번호, 항목명 검색..." oninput="renderTermsTable()">
+                <div class="table-wrapper">
+                    <table class="terms-table">
+                        <thead>
+                            <tr>
+                                <th>회선 (애칭/번호)</th>
+                                <th>통신사</th>
+                                <th>개통일</th>
+                                <th>항목명</th>
+                                <th>설정 기간</th>
+                                <th>만료/해제일 ▼</th>
+                                <th>상태 (D-Day)</th>
+                                <th style="text-align: center;">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="termsTableBody">
+                            <!-- JS Dynamic -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // -------------------------------------------------------------
+        // 1. Firebase 설정
+        // -------------------------------------------------------------
+        const firebaseConfig = {
+            apiKey: "AIzaSyBgxbF_lNsNOg46LdIUQVEUQEeFNEn6CR8",
+            authDomain: "my-phone-manager.firebaseapp.com",
+            projectId: "my-phone-manager",
+            storageBucket: "my-phone-manager.firebasestorage.app",
+            messagingSenderId: "473844294167",
+            appId: "1:473844294167:web:aac430aed05f1b2ccdf252"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null;
+        let lines = [];
+        let currentView = 'card';
+
+        document.getElementById('openDate').valueAsDate = new Date();
+
+        function switchView(viewName) {
+            currentView = viewName;
+            const cardArea = document.getElementById('cardViewArea');
+            const tableArea = document.getElementById('tableViewArea');
+            const btnCard = document.getElementById('tabCardView');
+            const btnTable = document.getElementById('tabTableView');
+
+            if (viewName === 'card') {
+                cardArea.style.display = 'block';
+                tableArea.style.display = 'none';
+                btnCard.classList.add('active');
+                btnTable.classList.remove('active');
+            } else {
+                cardArea.style.display = 'none';
+                tableArea.style.display = 'block';
+                btnCard.classList.remove('active');
+                btnTable.classList.add('active');
+                renderTermsTable();
+            }
+        }
+
+        // -------------------------------------------------------------
+        // 2. 인증 (구글 로그인)
+        // -------------------------------------------------------------
+        function googleLogin() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(error => {
+                alert('로그인 오류: ' + error.message);
+            });
+        }
+
+        function googleLogout() {
+            auth.signOut().then(() => {
+                alert('로그아웃 되었습니다.');
+            });
+        }
+
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+            const btnLogin = document.getElementById('btnLogin');
+            const userInfo = document.getElementById('userInfo');
+
+            if (user) {
+                btnLogin.style.display = 'none';
+                userInfo.style.display = 'flex';
+                document.getElementById('userName').textContent = user.displayName;
+                document.getElementById('userAvatar').src = user.photoURL || 'https://via.placeholder.com/32';
+                loadCloudData();
+            } else {
+                btnLogin.style.display = 'inline-flex';
+                userInfo.style.display = 'none';
+                lines = JSON.parse(localStorage.getItem('myPhoneLines')) || [];
+                renderAllViews();
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 3. 데이터 저장, 수정, 조회
+        // -------------------------------------------------------------
+        function loadCloudData() {
+            if (!currentUser) return;
+            db.collection('users').doc(currentUser.uid).collection('lines').get().then(snapshot => {
+                lines = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderAllViews();
+            }).catch(err => {
+                console.error("데이터 로드 실패:", err);
+            });
+        }
+
+        function renderAllViews() {
+            renderLines();
+            if (currentView === 'table') {
+                renderTermsTable();
+            }
+        }
+
+        function saveLineData(lineObj) {
+            if (currentUser) {
+                db.collection('users').doc(currentUser.uid).collection('lines').doc(String(lineObj.id)).set(lineObj)
+                  .then(() => loadCloudData());
+            } else {
+                const existingIndex = lines.findIndex(item => String(item.id) === String(lineObj.id));
+                if (existingIndex > -1) {
+                    lines[existingIndex] = lineObj;
+                } else {
+                    lines.push(lineObj);
+                }
+                localStorage.setItem('myPhoneLines', JSON.stringify(lines));
+                renderAllViews();
+            }
+        }
+
+        function deleteLine(id) {
+            if (!confirm('이 회선 정보를 삭제하시겠습니까?')) return;
+
+            if (currentUser) {
+                db.collection('users').doc(currentUser.uid).collection('lines').doc(String(id)).delete()
+                  .then(() => {
+                      if (document.getElementById('editLineId').value == id) resetForm();
+                      loadCloudData();
+                  });
+            } else {
+                lines = lines.filter(line => String(line.id) !== String(id));
+                localStorage.setItem('myPhoneLines', JSON.stringify(lines));
+                if (document.getElementById('editLineId').value == id) resetForm();
+                renderAllViews();
+            }
+        }
+
+        function editLine(id) {
+            const target = lines.find(line => String(line.id) === String(id));
+            if (!target) return;
+
+            document.getElementById('editLineId').value = target.id;
+            document.getElementById('telecom').value = target.telecom || 'SKT';
+            document.getElementById('nickname').value = target.nickname || target.phoneNumber || '';
+            document.getElementById('phoneNumber').value = target.phoneNumber || '';
+            document.getElementById('openDate').value = target.openDate || '';
+
+            document.getElementById('term1Label').value = target.term1Label || '';
+            document.getElementById('term1Value').value = target.term1Value !== undefined ? target.term1Value : '';
+            document.getElementById('term1Unit').value = target.term1Unit || 'days';
+
+            document.getElementById('term2Label').value = target.term2Label || '';
+            document.getElementById('term2Value').value = target.term2Value !== undefined ? target.term2Value : '';
+            document.getElementById('term2Unit').value = target.term2Unit || 'days';
+
+            document.getElementById('term3Label').value = target.term3Label || '';
+            document.getElementById('term3Value').value = target.term3Value !== undefined ? target.term3Value : '';
+            document.getElementById('term3Unit').value = target.term3Unit || 'mplus';
+
+            document.getElementById('memo').value = target.memo || '';
+
+            document.getElementById('formTitle').textContent = '회선 정보 수정';
+            document.getElementById('btnSubmit').textContent = '수정 완료';
+            document.getElementById('btnCancel').style.display = 'block';
+
+            renderAllViews();
+        }
+
+        function resetForm() {
+            document.getElementById('editLineId').value = '';
+            document.getElementById('lineForm').reset();
+            document.getElementById('openDate').valueAsDate = new Date();
+
+            document.getElementById('formTitle').textContent = '신규 회선 추가';
+            document.getElementById('btnSubmit').textContent = '회선 저장하기';
+            document.getElementById('btnCancel').style.display = 'none';
+
+            renderAllViews();
+        }
+
+        // -------------------------------------------------------------
+        // 4. 날짜 및 UI 계산 렌더링
+        // -------------------------------------------------------------
+        function addDays(dateStr, days) {
+            const date = new Date(dateStr);
+            date.setDate(date.getDate() + parseInt(days));
+            return date;
+        }
+
+        function getMPlusDate(dateStr, months) {
+            const date = new Date(dateStr);
+            return new Date(date.getFullYear(), date.getMonth() + parseInt(months) + 1, 0);
+        }
+
+        function formatDate(dateObj) {
+            if (!dateObj || isNaN(dateObj.getTime())) return '';
+            const y = dateObj.getFullYear();
+            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dateObj.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function getDDay(targetDateStr) {
+            if (!targetDateStr) return '';
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const target = new Date(targetDateStr);
+            target.setHours(0,0,0,0);
+            const diffDays = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+
+            if (diffDays > 0) return `D-${diffDays}`;
+            if (diffDays === 0) return `D-Day`;
+            return `해제완료 (+${Math.abs(diffDays)}일)`;
+        }
+
+        function getTelecomLabel(val) {
+            const map = {
+                'SKT': 'SKT',
+                'KT': 'KT',
+                'LGU': 'LGU+',
+                'MVNO-SKT': '알뜰폰 (SKT)',
+                'MVNO-KT': '알뜰폰 (KT)',
+                'MVNO-LGU': '알뜰폰 (LGU+)'
+            };
+            return map[val] || val;
+        }
+
+        document.getElementById('lineForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const editId = document.getElementById('editLineId').value;
+
+            const lineData = {
+                id: editId ? (isNaN(editId) ? editId : Number(editId)) : Date.now(),
+                telecom: document.getElementById('telecom').value,
+                nickname: document.getElementById('nickname').value,
+                phoneNumber: document.getElementById('phoneNumber').value,
+                openDate: document.getElementById('openDate').value,
+                term1Label: document.getElementById('term1Label').value,
+                term1Value: document.getElementById('term1Value').value,
+                term1Unit: document.getElementById('term1Unit').value,
+                term2Label: document.getElementById('term2Label').value,
+                term2Value: document.getElementById('term2Value').value,
+                term2Unit: document.getElementById('term2Unit').value,
+                term3Label: document.getElementById('term3Label').value,
+                term3Value: document.getElementById('term3Value').value,
+                term3Unit: document.getElementById('term3Unit').value,
+                memo: document.getElementById('memo').value
+            };
+
+            saveLineData(lineData);
+            resetForm();
+        });
+
+        function calcUnlockDate(openDate, val, unit) {
+            if (!openDate || !val) return '';
+            if (unit === 'days') {
+                return formatDate(addDays(openDate, val));
+            } else {
+                return formatDate(getMPlusDate(openDate, val));
+            }
+        }
+
+        function renderLines() {
+            const lineList = document.getElementById('lineList');
+            const editingId = document.getElementById('editLineId').value;
+            document.getElementById('total-count').textContent = lines.length;
+
+            if (lines.length === 0) {
+                lineList.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #94a3b8;">등록된 회선이 없습니다.</div>';
+                return;
+            }
+
+            lineList.innerHTML = lines.map(line => {
+                const isEditing = String(line.id) === String(editingId);
+                const unitText = (u) => u === 'days' ? '일' : 'M+개월';
+
+                const displayNickname = line.nickname || line.phoneNumber || '회선';
+                const displayPhone = line.phoneNumber || '-';
+
+                // 기간 1
+                const t1Label = line.term1Label || (line.neutralDays ? '중립 가능 기간' : '');
+                const t1Val = line.term1Value !== undefined && line.term1Value !== '' ? line.term1Value : line.neutralDays;
+                const t1Unit = line.term1Unit || 'days';
+                const target1Date = calcUnlockDate(line.openDate, t1Val, t1Unit);
+                const dDay1 = getDDay(target1Date);
+
+                // 기간 2
+                const t2Label = line.term2Label || (line.minCallDays ? '의무 통화 유지기간' : '');
+                const t2Val = line.term2Value !== undefined && line.term2Value !== '' ? line.term2Value : line.minCallDays;
+                const t2Unit = line.term2Unit || 'days';
+                const target2Date = calcUnlockDate(line.openDate, t2Val, t2Unit);
+                const dDay2 = getDDay(target2Date);
+
+                // 기간 3
+                const t3Label = line.term3Label || (line.mandatoryMonths ? '의무 유지기간' : '');
+                const t3Val = line.term3Value !== undefined && line.term3Value !== '' ? line.term3Value : line.mandatoryMonths;
+                const t3Unit = line.term3Unit || 'mplus';
+                const target3Date = calcUnlockDate(line.openDate, t3Val, t3Unit);
+                const dDay3 = getDDay(target3Date);
+
+                return `
+                    <div class="line-card ${isEditing ? 'editing' : ''}">
+                        <div class="card-actions">
+                            <button class="btn-card-icon" title="수정" onclick="editLine('${line.id}')">✏️</button>
+                            <button class="btn-card-icon" title="삭제" onclick="deleteLine('${line.id}')">❌</button>
+                        </div>
+                        <div class="line-header">
+                            <div class="card-title-row">
+                                <span class="nickname-title">${displayNickname}</span>
+                                <span class="telecom-badge ${line.telecom}">${getTelecomLabel(line.telecom)}</span>
+                            </div>
+                            <div class="phone-sub-title">📞 ${displayPhone}</div>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">개통일:</span>
+                            <span class="info-value">${line.openDate || '-'}</span>
+                        </div>
+
+                        ${(t1Label || t1Val) ? `
+                        <div class="info-row">
+                            <span class="info-label">${t1Label || '기간 1'}${t1Val ? ` (+${t1Val}${unitText(t1Unit)})` : ''}:</span>
+                            <span class="info-value">
+                                ${target1Date || '-'}
+                                ${dDay1 ? `<span class="status-tag ${dDay1.includes('완료') ? 'status-ok' : 'status-wait'}">${dDay1}</span>` : ''}
+                            </span>
+                        </div>` : ''}
+
+                        ${(t2Label || t2Val) ? `
+                        <div class="info-row">
+                            <span class="info-label">${t2Label || '기간 2'}${t2Val ? ` (+${t2Val}${unitText(t2Unit)})` : ''}:</span>
+                            <span class="info-value">
+                                ${target2Date || '-'}
+                                ${dDay2 ? `<span class="status-tag ${dDay2.includes('완료') ? 'status-ok' : 'status-wait'}">${dDay2}</span>` : ''}
+                            </span>
+                        </div>` : ''}
+
+                        ${(t3Label || t3Val) ? `
+                        <div class="info-row">
+                            <span class="info-label">${t3Label || '기간 3'}${t3Val ? ` (+${t3Val}${unitText(t3Unit)})` : ''}:</span>
+                            <span class="info-value">
+                                ${target3Date || '-'}
+                                ${dDay3 ? `<span class="status-tag ${dDay3.includes('완료') ? 'status-ok' : 'status-wait'}">${dDay3}</span>` : ''}
+                            </span>
+                        </div>` : ''}
+
+                        ${line.memo ? `<div class="memo-box">${line.memo}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 전체 기간 설정 테이블 조회 렌더링 (만료일 역순 정렬 적용)
+        function renderTermsTable() {
+            const tableBody = document.getElementById('termsTableBody');
+            const filterText = (document.getElementById('tableFilterInput').value || '').toLowerCase();
+            const unitText = (u) => u === 'days' ? '일' : 'M+개월';
+
+            let termRows = [];
+
+            lines.forEach(line => {
+                const nickname = line.nickname || line.phoneNumber || '회선';
+                const phone = line.phoneNumber || '-';
+                const telecom = getTelecomLabel(line.telecom);
+                const openDate = line.openDate || '-';
+
+                const termConfigs = [
+                    { label: line.term1Label || (line.neutralDays ? '중립 가능 기간' : ''), val: line.term1Value !== undefined && line.term1Value !== '' ? line.term1Value : line.neutralDays, unit: line.term1Unit || 'days' },
+                    { label: line.term2Label || (line.minCallDays ? '의무 통화 유지' : ''), val: line.term2Value !== undefined && line.term2Value !== '' ? line.term2Value : line.minCallDays, unit: line.term2Unit || 'days' },
+                    { label: line.term3Label || (line.mandatoryMonths ? '의무 유지기간' : ''), val: line.term3Value !== undefined && line.term3Value !== '' ? line.term3Value : line.mandatoryMonths, unit: line.term3Unit || 'mplus' }
+                ];
+
+                termConfigs.forEach(term => {
+                    if (term.label || term.val) {
+                        const targetDate = calcUnlockDate(openDate, term.val, term.unit);
+                        const dDay = getDDay(targetDate);
+
+                        termRows.push({
+                            id: line.id,
+                            nickname,
+                            phone,
+                            telecom,
+                            telecomClass: line.telecom,
+                            openDate,
+                            termLabel: term.label || '미지정',
+                            termValueStr: term.val ? `+${term.val}${unitText(term.unit)}` : '-',
+                            targetDate: targetDate || '',
+                            dDay: dDay
+                        });
+                    }
+                });
+            });
+
+            // 만료/해제일(targetDate) 기준 역순(내림차순) 정렬
+            termRows.sort((a, b) => {
+                if (!a.targetDate) return 1;
+                if (!b.targetDate) return -1;
+                return b.targetDate.localeCompare(a.targetDate);
+            });
+
+            // 필터링 적용
+            if (filterText) {
+                termRows = termRows.filter(r =>
+                    r.nickname.toLowerCase().includes(filterText) ||
+                    r.phone.toLowerCase().includes(filterText) ||
+                    r.termLabel.toLowerCase().includes(filterText)
+                );
+            }
+
+            if (termRows.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 32px;">설정된 기간 데이터가 없거나 검색 결과가 없습니다.</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = termRows.map(row => `
+                <tr>
+                    <td><strong style="font-size:0.95rem; color:#0f172a;">${row.nickname}</strong><br><span style="font-size:0.8rem; color:#64748b;">${row.phone}</span></td>
+                    <td><span class="telecom-badge ${row.telecomClass}">${row.telecom}</span></td>
+                    <td><span style="color:#475569;">${row.openDate}</span></td>
+                    <td><strong style="font-size:0.92rem; color:#1e293b;">${row.termLabel}</strong></td>
+                    <td><span style="font-weight:600; color:#3b82f6;">${row.termValueStr}</span></td>
+                    <td><span style="font-weight:600;">${row.targetDate || '-'}</span></td>
+                    <td>${row.dDay ? `<span class="status-tag ${row.dDay.includes('완료') ? 'status-ok' : 'status-wait'}">${row.dDay}</span>` : '-'}</td>
+                    <td style="text-align: center;"><button class="btn-card-icon" title="수정" onclick="editLine('${row.id}')">✏️</button></td>
+                </tr>
+            `).join('');
+        }
+
+        // -------------------------------------------------------------
+        // 5. 엑셀 저장 & 불러오기
+        // -------------------------------------------------------------
+        function exportToExcel() {
+            if (lines.length === 0) return alert('내보낼 데이터가 없습니다.');
+
+            const unitText = (u) => u === 'days' ? '일' : 'M+개월';
+
+            const exportData = lines.map(line => {
+                const t1Label = line.term1Label || '기간 1';
+                const t1Val = line.term1Value !== undefined ? line.term1Value : (line.neutralDays || '');
+                const t1Unit = line.term1Unit || 'days';
+
+                const t2Label = line.term2Label || '기간 2';
+                const t2Val = line.term2Value !== undefined ? line.term2Value : (line.minCallDays || '');
+                const t2Unit = line.term2Unit || 'days';
+
+                const t3Label = line.term3Label || '기간 3';
+                const t3Val = line.term3Value !== undefined ? line.term3Value : (line.mandatoryMonths || '');
+                const t3Unit = line.term3Unit || 'mplus';
+
+                return {
+                    '통신사': getTelecomLabel(line.telecom),
+                    '애칭': line.nickname || '',
+                    '전화번호': line.phoneNumber || '',
+                    '개통일': line.openDate,
+                    [`${t1Label}(${unitText(t1Unit)})`]: t1Val,
+                    [`${t2Label}(${unitText(t2Unit)})`]: t2Val,
+                    [`${t3Label}(${unitText(t3Unit)})`]: t3Val,
+                    '메모': line.memo || ''
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "회선목록");
+            XLSX.writeFile(workbook, `회선관리_${formatDate(new Date())}.xlsx`);
+        }
+
+        function importFromExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+
+                json.forEach((row, index) => {
+                    let telecomVal = row['통신사'] || 'SKT';
+                    if (telecomVal.includes('SKT') && telecomVal.includes('알뜰')) telecomVal = 'MVNO-SKT';
+                    else if (telecomVal.includes('KT') && telecomVal.includes('알뜰')) telecomVal = 'MVNO-KT';
+                    else if (telecomVal.includes('LGU') && telecomVal.includes('알뜰')) telecomVal = 'MVNO-LGU';
+
+                    saveLineData({
+                        id: Date.now() + index,
+                        telecom: telecomVal,
+                        nickname: row['애칭'] || row['회선명'] || '회선' + (index + 1),
+                        phoneNumber: row['전화번호'] || row['회선명/번호'] || '',
+                        openDate: row['개통일'] ? formatDate(new Date(row['개통일'])) : formatDate(new Date()),
+                        term1Label: '',
+                        term1Value: '',
+                        term1Unit: 'days',
+                        term2Label: '',
+                        term2Value: '',
+                        term2Unit: 'days',
+                        term3Label: '',
+                        term3Value: '',
+                        term3Unit: 'mplus',
+                        memo: row['메모'] || ''
+                    });
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html>
